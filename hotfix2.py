@@ -32,6 +32,13 @@ def sendInput(channel,input,secs):
     time.sleep(secs)
     return
 
+def gethostname(ssh,cmd):
+    stdin,stdout,stderr = ssh.exec_command(cmd)
+    hostlist=stdout.readlines()
+    for item in hostlist:
+        hostname = item
+    return(hostname.strip())
+
 def sendCreds(channel,input,secs):
     channel.send(input)
     channel.send('\n')
@@ -71,12 +78,13 @@ def passCreds(channel,buf_data):
         sendCreds(channel, pwd, 15)
         return
 
-def cloneUnity(channel):
+def cloneUnity(channel,hostname):
     print("Cloning unity folder.....")
     buf_data = ' '
     git_clone_cmd = "git-lfs clone https://eos2git.cec.lab.emc.com/PIE/unity \n"
     sendInput(channel, git_clone_cmd, 30)
 
+    prompt = "c4dev@" + hostname + ":~/hotfix>"
     while True:
         buf_data = channel.recv(9999).decode("utf-8")
         print ("#######################################")
@@ -90,14 +98,17 @@ def cloneUnity(channel):
             print ("git-lfs clone completed")
             break
 
-        elif "Username for" in buf_data or "Password for" in buf_data:
+        if "Username for" in buf_data or "Password for" in buf_data:
             passCreds(channel,buf_data)
             continue
 
+        elif prompt in buf_data:
+            print ("Git-lfs clone completed")
+            break
+            
         else:
             time.sleep(10)
             continue
-    return
 
 def git_checkout(channel, parent_id):
     cdCMD = "cd /home/c4dev/hotfix/unity\n"
@@ -165,6 +176,7 @@ if __name__ == "__main__":
 
     ssh = connection.connectHost(sles15,os_user,os_pwd)
     channel = ssh.invoke_shell()
+    host = gethostname(ssh,"hostname")
 
     sftp=connection.transport(sles15, os_user,os_pwd)
     folders_list = sftp.listdir('/home/c4dev')
@@ -199,7 +211,7 @@ if __name__ == "__main__":
             recv_buf = channel.recv(9999).decode("utf-8")
 
             print ("Cloning git unity folder \n")
-            cloneUnity(channel)
+            cloneUnity(channel,host)
 
             print ("Checking out the parent_id: " + parent_id + "\n")
             git_checkout(channel,parent_id)
