@@ -5,7 +5,8 @@ import requests
 import connection
 
 #Constants
-host_ip="10.207.64.230"
+host="10.207.64.230"
+array="10.229.34.252"
 user_name="root"
 pwd="Password123!"
 uemcli_file="UnisphereCLI-SUSE-Linux-64-x86-en_US-5.1.2.1501141-1.x86_64.rpm"
@@ -25,7 +26,6 @@ def uemcli_check(ssh):
             return (dict1['Version'])
         else:
             print ("issue encountered. Please check output of uemcli -v and manually uninstall uemcli")
-
 
 def uemcli_uninstall(ssh,version):
     print ("Currently uninstalling, please wait.....")
@@ -50,10 +50,38 @@ def uemcli_install(ssh):
     else:
         print("uemcli installation failed...")
 
+def connection_check(ssh):
+    print ("Verifying uemcli connection to array by running an healthcheck onto array: ",array)
+    recv_buf=[]
+    output = []
+    uemcli_cmd="uemcli -d "+array+" -u admin -p Password123! /sys/general healthcheck"
+    channel=ssh.invoke_shell()
+    channel.send(uemcli_cmd + "\n")
+    while True:
+        if channel.recv_ready():
+            print ("channel is ready \n \n")
+            while True:
+                time.sleep(10)
+                recv_buf= channel.recv(9999).decode("utf-8")
+                print (recv_buf)
+                if "Please input your selection (The default selection is [1]):" in recv_buf.rstrip():
+                    option = input ("Waiting for input: ")
+                    channel.send(option)
+                    channel.send("\n")
+                elif "Operation completed successfully." in recv_buf.rstrip():
+                    print ("UEMCLI connection check completed.")
+                    return
+        else:
+            time.sleep(10)
+            print ("Channel is not ready.. wait for channel to be ready")
+            continue
+
+
+
 if __name__ == "__main__":
 
-    ssh = connection.connectHost(host_ip,user_name,pwd)
-    sftp = connection.transport(host_ip,user_name,pwd)
+    ssh = connection.connectHost(host,user_name,pwd)
+    sftp = connection.transport(host,user_name,pwd)
     target_path="/root/"+uemcli_file
     print (target_path)
     sftp.put(uemcli_file,target_path,confirm=True)
@@ -69,9 +97,11 @@ if __name__ == "__main__":
             uemcli_install(ssh)
         elif (option == 'n'):
             print ("Opted not to uninstall the uemcli. Hence stopping the script.")
+            exit()
     else:
         print ("uemcli not present. Proceeding to install uemcli")
         uemcli_install(ssh)
+    connection_check(ssh)
 
     sftp.close()
     ssh.close()
