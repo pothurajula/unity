@@ -71,6 +71,9 @@ def connection_check(ssh):
                 elif "Operation completed successfully." in recv_buf.rstrip():
                     print ("UEMCLI connection check completed.")
                     return
+                else:
+                    print ("Couldn't connect to the array mentioned. Please try connecting manually once")
+                    exit()
         else:
             time.sleep(10)
             print ("Channel is not ready.. wait for channel to be ready")
